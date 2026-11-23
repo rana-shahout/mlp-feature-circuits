@@ -1,0 +1,11 @@
+version: stage1_tuning_v1
+base_run: results/stage1-seed106
+hidden_widths: [48, 128, 256]
+epochs: 1000
+# Each candidate retains the baseline seed, embeddings, data and unweighted MSE.
+selection: worst_rule_balanced_accuracy_then_macro_then_mse
+fresh_data_seed: 303
+fresh_contrast_seed: 305
+fresh_proposal_samples: 30000
+fresh_sample_limit: 10000
+fresh_contexts_per_rule: 128

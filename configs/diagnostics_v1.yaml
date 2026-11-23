@@ -1,0 +1,39 @@
+version: diagnostics_v1
+device: cuda
+batch_size: 2048
+context_seed: 901
+interaction_batch_size: 16
+interaction_atol: 1.0e-9
+interaction_rtol: 1.0e-8
+store_explicit_contributions: true
+holdout: results/stage1-coverage-v2/fresh_dataset.npz
+models:
+  106: results/stage1-coverage-v2/width1024
+  107: results/stage1-replication-v2/seed107
+  108: results/stage1-replication-v2/seed108
+  109: results/stage1-replication-v2/seed109
+  110: results/stage1-replication-v2/seed110
+# Non-intervened semantic inputs and nuisance identities stay fixed per context.
+# Intervened coordinates are always cleared before enumerating all corners.
+contexts:
+  - {name: zero, semantic_active: [], distractor_count: 0}
+  - {name: distractors_2, semantic_active: [], distractor_count: 2}
+  - {name: distractors_4, semantic_active: [], distractor_count: 4}
+  - {name: distractors_6, semantic_active: [], distractor_count: 6}
+  - {name: and3_gate8, semantic_active: [8], distractor_count: 2}
+  - {name: and3_gate9, semantic_active: [9], distractor_count: 2}
+  - {name: and3_gate10, semantic_active: [10], distractor_count: 2}
+  - {name: inhibitor5, semantic_active: [5], distractor_count: 2}
+  - {name: inhibitor15, semantic_active: [15], distractor_count: 2}
+  - {name: mixed_xor17, semantic_active: [17], distractor_count: 2}
+  - {name: mixed_xor4, semantic_active: [4], distractor_count: 2}
+  - {name: mixed_xor16, semantic_active: [16], distractor_count: 2}
+  - {name: dnf_second, semantic_active: [12, 13], distractor_count: 2}
+  - {name: dnf_first, semantic_active: [0, 11], distractor_count: 2}
+  - {name: mixed_or14, semantic_active: [14], distractor_count: 2}
+# Operational review criteria only; not proof of mechanistic correctness.
+review:
+  association_min_positive_support: 10
+  min_balanced_accuracy: 0.95
+  min_recall: 0.90
+  max_mean_interaction_absolute_error: 0.10

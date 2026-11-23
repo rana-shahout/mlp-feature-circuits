@@ -1,0 +1,39 @@
+version: sparse_superposition_v1
+device: cuda
+results_dir: results
+seeds:
+  input_embedding: 101
+  output_embedding: 102
+  data: 103
+  split: 104
+  contrast: 105
+  model: 106
+data:
+  n_features: 32
+  n_samples: 50000
+  max_attempts: 1000000
+  min_samples: 1000
+  split_fractions: [0.7, 0.15, 0.15]
+  active_counts: [2, 3, 4, 5, 6]
+  active_probabilities: [0.15, 0.35, 0.30, 0.15, 0.05]
+  mode_probabilities: [0.4, 0.3, 0.3]
+  rule_ids: [and_01, or_23, inhibition_45, xor_67, and_8910, overlapping_dnf, mixed_inhibition, mixed_xor]
+  contrast_contexts_per_rule: 32
+  geometry_probe_samples: 1024
+model:
+  d_in: 16
+  d_hidden: 48
+  d_out: 12
+training:
+  optimizer: adam
+  learning_rate: 0.001
+  weight_decay: 0.0
+  batch_size: 512
+  epochs: 200
+  deterministic: true
+evaluation:
+  batch_size: 2048
+  classification_threshold: 0.5
+  # Flags for review, not a scientifically established stage-passage criterion.
+  review_min_balanced_accuracy: 0.9
+  review_max_semantic_mse: 0.05

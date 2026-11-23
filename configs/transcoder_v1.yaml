@@ -1,0 +1,35 @@
+version: transcoder_v1
+teacher_run: results/stage1-replication-v2/seed109
+frozen_models:
+  - results/stage1-coverage-v2/width1024
+  - results/stage1-replication-v2/seed107
+  - results/stage1-replication-v2/seed108
+  - results/stage1-replication-v2/seed109
+  - results/stage1-replication-v2/seed110
+teacher_diagnostics: results/diagnostics-20261027T132121Z-726003
+previous_evaluation: results/stage1-coverage-v2/fresh_dataset.npz
+widths: [128, 256]
+lambdas: [0.0, 0.0001, 0.001, 0.01]
+student_seed: 2109
+device: cuda
+training:
+  epochs: 500
+  batch_size: 1024
+  learning_rate: 0.001
+  minimum_learning_rate: 0.00001
+  lr_schedule: cosine
+  checkpoint_selection: validation_full_output_mse
+  decoder_constraint: unit_l2_columns
+  l1_reduction: mean_over_examples_of_sum_over_units
+  sampling: uniform_original_teacher_train_partition
+evaluation_batch_size: 2048
+interaction_batch_size: 16
+interaction_atol: 1.0e-9
+interaction_rtol: 1.0e-8
+final_population:
+  sample_seed: 1800
+  contrast_seed: 1801
+  proposal_count: 30000
+  sample_limit: 10000
+  contexts_per_rule: 256
+  score_in_initial_run: false

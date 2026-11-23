@@ -1,0 +1,7 @@
+version: stage1_replication_v2
+source_run: results/stage1-coverage-v2/width1024
+holdout: results/stage1-coverage-v2/fresh_dataset.npz
+reference_metrics: results/stage1-coverage-v2/fresh_metrics.json
+seeds: [106, 107, 108, 109, 110]
+# Frozen architecture, training distribution, loss, schedule and epoch budget.
+# All seeds reported; no best-seed selection and no tuning on these holdouts.

@@ -1,0 +1,35 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+results/
+logs/
+build/
+dist/
+# Model weights and checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+
+# Generated experiment outputs
+results/
+logs/
+runs/
+reports/
+traces/
+diagnostics/
+execution_logs/
+latent_correspondence_runs/
+native_matrix_runs/
+
+# Generated data
+*.npy
+*.npz
+*.parquet
+*.pkl
+*.pickle
+*.log
+wandb/

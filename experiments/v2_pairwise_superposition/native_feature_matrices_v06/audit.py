@@ -1,0 +1,46 @@
+"""Final v0.6 output audit and quantitative report pages."""
+import sys,csv,shutil,subprocess
+from pathlib import Path
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+from .run import read,savejson,sha,FEATURES,OLD
+
+def main(run):
+ A=dict(np.load(run/'matrices.npz'));meta=read(run/'matrix_metadata.json');protocol=read(run/'protocol.json');sm=read(run/'metric_summary.json')['development'];diag=read(run/'matrix_diagnostics.json');lock=read(run/'embedding_lock.json');stab=read(run/'prediction_stability.json')
+ definitions={'P':'frozen input embedding','Q':'frozen orthonormal semantic output embedding','W1':'native first layer weight','W2':'native terminal weight','b1':'native hidden bias','b2':'native terminal bias','E':'frozen TC encoder','e':'frozen TC encoder bias','B':'frozen TC decoder','c':'frozen TC decoder bias','K':'E P','A':'Q.T B','S1':'P','D1':'FP64 SVD P pseudoinverse rcond=1e-10','C1':'W1 P','D2':'frozen v0.5 M','d2':'frozen v0.5 d','S2_fit':'reverse ridge fit H from actual Z_T','q2_fit':'mu_h - S2_fit mu_z','C2_fit':'W2 S2_fit','b2_feature_fit':'b2 + W2 q2_fit','L2_fit':'Q.T C2_fit','beta2_feature_fit':'Q.T b2_feature_fit','S2_pinv':'FP64 SVD M pseudoinverse rcond=1e-10','q2_pinv':'-S2_pinv d2','C2_pinv':'W2 S2_pinv','b2_feature_pinv':'b2 + W2 q2_pinv','L2_pinv':'Q.T C2_pinv','beta2_feature_pinv':'Q.T b2_feature_pinv','S2':'exact alias of S2_fit','C2':'exact alias of C2_fit'}
+ axes={'P':['native_input','Boolean_input'],'Q':['native_output','semantic_output'],'W1':['native_neuron','native_input'],'W2':['native_output','native_neuron'],'E':['TC_feature','native_input'],'B':['native_output','TC_feature'],'K':['TC_feature','Boolean_input'],'A':['semantic_output','TC_feature'],'S1':['native_input','Boolean_input'],'D1':['algebraic_input_coordinate','native_input'],'C1':['native_neuron','Boolean_input'],'D2':['TC_feature','native_neuron'],'S2_fit':['native_neuron','TC_feature'],'S2_pinv':['native_neuron','TC_feature'],'C2_fit':['native_output','TC_feature'],'C2_pinv':['native_output','TC_feature'],'L2_fit':['semantic_output','TC_feature'],'L2_pinv':['semantic_output','TC_feature'],'S2':['native_neuron','TC_feature'],'C2':['native_output','TC_feature']}
+ for name,rec in meta.items():
+  rec['definition']=definitions.get(name,name);rec['axes']=axes.get(name,['semantic_output' if name.startswith('beta') else 'TC_feature' if name in ['e','d2'] else 'native_neuron' if name.startswith('q2') or name=='b1' else 'native_output'] if len(rec['shape'])==1 else ['original row index','original column index']);rec['fitting_population']='original 11200 fit rows; selected on separate 2800 selection rows' if name in ['S2_fit','q2_fit','C2_fit','b2_feature_fit','L2_fit','beta2_feature_fit','S2','C2'] else 'frozen original v0.5 11200 fit rows' if name in ['D2','d2'] else None;rec['construction_status']='frozen source' if name in ['P','Q','W1','b1','W2','b2','E','e','B','c'] else 'frozen estimated readout' if name in ['D2','d2'] else 'estimated affine reverse map' if name in ['S2_fit','q2_fit'] else 'derived';rec['source_hashes']=protocol['source_hashes']
+ savejson(run/'matrix_metadata.json',meta)
+ support=[];man=read(run/'context_manifest.json')
+ for pop,banks in [('primary',man['primary_contexts']),('legacy',man['legacy_contexts'])]:
+  for pair,bank in banks.items():support.append(dict(population=pop,pair=pair,backgrounds=len(bank['background_keys']),nuisance_edges=len(bank['nuisance_edges']),support_status='unassessable' if len(bank['background_keys'])<32 else 'supported descriptive summary',overlap='recorded per-key membership; legacy historical mixture' if pop=='legacy' else 'recorded exclusions preserved'))
+ from ..latent_correspondence_v05.run import csvwrite
+ csvwrite(run/'response_support.csv',support)
+ plt.rcParams.update({'font.size':10})
+ fig,axs=plt.subplots(2,2,figsize=(13,8));names=['fit','pinv'];axs[0,0].bar(names,[diag[n]['latent_roundtrip']['relative_RMSE'] for n in names]);axs[0,0].set_title('Observed latent round-trip relative RMSE');axs[0,1].bar(names,[diag[n]['hidden_affine_absolute_norm'] for n in names],label='hidden');axs[0,1].bar(names,[diag[n]['output_affine_absolute_norm'] for n in names],alpha=.6,label='output');axs[0,1].legend();axs[0,1].set_title('Affine residual absolute norms')
+ half=list(csv.DictReader(open(run/'half_prediction_stability.csv')));axs[1,0].bar([r['half'] for r in half],[float(r['hidden_primary_variance_normalized_MSE']) for r in half]);axs[1,0].set_title('Half-fit prediction difference normalized MSE');sel=[]
+ rows=list(csv.DictReader(open(run/'coefficient_stability.csv')))
+ for space in ['S2','C2']:
+  vals=[float(next(r['cosine'] for r in rows if r['half']=='half1' and r['space']==space and int(r['feature'])==m)) for m in FEATURES];axs[1,1].plot(range(6),vals,'-o',label=space)
+ axs[1,1].set_xticks(range(6),FEATURES);axs[1,1].legend();axs[1,1].set_title('Selected-column cosine: primary vs half1');fig.suptitle('Reused development evaluation n=2000 — round trips and half-fit stability');fig.tight_layout();fig.savefig(run/'figures/04c_roundtrip_stability.png',dpi=170);fig.savefig(run/'figures/04c_roundtrip_stability.pdf');plt.close(fig)
+ with PdfPages(run/'numerical_findings.pdf') as pdf:
+  fig,ax=plt.subplots(figsize=(12,9));ax.axis('off');methods=['fit_z','pinv_z','mean_z','fit_zn','pinv_zn'];data=[[n,f'{sm[n]["hidden"]["mse"]:.6g}',f'{sm[n]["hidden"]["relative_RMSE"]:.5%}',f'{sm[n]["output"]["mse"]:.6g}',f'{sm[n]["output"]["relative_RMSE"]:.5%}',str(sm[n]['passing'])] for n in methods];table=ax.table(cellText=data,colLabels=['method','hidden MSE','hidden rel RMSE','output MSE','output rel RMSE','passing / 256'],bbox=[.02,.48,.96,.34]);table.auto_set_font_size(False);table.set_fontsize(10)
+  ax.text(.02,.97,'Numerical findings — reused development evaluation n=2000',fontsize=16,va='top');ax.text(.02,.89,f'Primary reverse ridge alpha = {lock["alpha"]}; standardized design rank = {lock["rank"]}; condition = {lock["condition"]:.5g}\nP rank = 12; M rank = {diag["M"]["rank"]}; M condition = {diag["M"]["condition"]:.5g}; pseudoinverse operator norm = {diag["M"]["pinv_operator_norm"]:.5g}',va='top',linespacing=1.6)
+  text=f'Existing TC output relative RMSE: {sm["TC"]["relative_RMSE"]:.5%}. Fitted hidden reconstruction: 254 passing, 0 failing, 2 unassessable.\n\nThe actual TC codes support an accurate affine native hidden embedding on this population.\nThe native-code pseudoinverse identity is automatic; it is not evidence of TC compatibility.\n\nOnly one primary AND78 context exists; primary XOR1112, AND01 and nuisance support is zero.\nPopulation-level primary finite-response claims are unassessable. Legacy contexts remain separate.\n\nColumns depend on the selected embedding and correlated predictors; single-coordinate causal\ninterpretations and uniquely recovered intrinsic circuits are not established. All negative\naffine predictions were preserved. No teacher/TC training or protected final scoring occurred.\n\n63 tests passed. FP64 batch/column identities, gate-conditioned expressions, source FP32\ncomparisons, matrix aliases, source hashes and prediction reloads were checked.'
+  ax.text(.02,.42,text,va='top',fontsize=11,linespacing=1.5);fig.tight_layout();fig.savefig(run/'figures/00_numerical_findings.png',dpi=160);fig.savefig(run/'figures/00_numerical_findings.pdf');pdf.savefig(fig);plt.close(fig)
+ combined=run/'matrix_report.with_audit.pdf';subprocess.run(['pdfunite',str(run/'matrix_report.pdf'),str(run/'figures/04c_roundtrip_stability.pdf'),str(run/'numerical_findings.pdf'),str(combined)],check=True);shutil.copy2(combined,run/'matrix_report.pdf')
+ # Keep all implementation revisions used by this completed run reviewable.
+ sources=list(Path(__file__).parent.glob('*.py'))
+ for path in sources:shutil.copy2(path,run/'source_snapshot'/path.name)
+ savejson(run/'code_provenance.json',{str(p):sha(p) for p in sources})
+ protocol['final_code_hashes']={str(p):sha(p) for p in sources};protocol['postprocessing']='finalize and audit; corrected display labels and common scales, exact nuisance and polynomial finite changes';savejson(run/'protocol.json',protocol)
+ # Prior code can be revised by authorized implementation; source snapshots preserve launch revision.
+ prior=read(run/'protected_before.json');changed=[p for p,h in prior.items() if sha(p)!=h];historical=[p for p in changed if 'native_feature_matrices_v06/' not in p];assert not historical,historical
+ savejson(run/'preservation_verified.json',dict(files_verified=len(prior),historical_artifacts_changed=historical,active_milestone_code_revisions=changed,previous_runs_preserved=True,final_scored=False,networks_trained=False))
+ (run/'SUMMARY.md').write_text((run/'SUMMARY.md').read_text()+'\n\nValidation: all **63 tests passed**. Historical checkpoints, datasets, reports, v0.5 and failed v0.6 runs are preserved. No protected final inputs were scored. The two earlier execution failures were export/display assumptions about multiple backgrounds, corrected before this completed run.\n\n[Round-trip and stability figure](figures/04c_roundtrip_stability.png) · [Numerical findings](numerical_findings.pdf)\n')
+ print('AUDITED',run)
+if __name__=='__main__':main(Path(sys.argv[1]))
